@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist gettext-domain="clip-flow">
+  <schema id="org.gnome.shell.extensions.clip-flow"
+          path="/org/gnome/shell/extensions/clip-flow/">
+
+    <key name="open-history" type="as">
+      <default><![CDATA[['<Super>v']]]></default>
+      <summary>Ouvrir le panneau d'historique</summary>
+    </key>
+
+    <key name="paste-latest" type="as">
+      <default>[]</default>
+      <summary>Coller directement la dernière entrée</summary>
+      <description>Facultatif : recolle la dernière entrée sans afficher le panneau.</description>
+    </key>
+
+    <key name="history-size" type="i">
+      <default>0</default>
+      <range min="0" max="100000"/>
+      <summary>Nombre d'entrées conservées (0 = illimité)</summary>
+    </key>
+
+    <key name="cache-images" type="b">
+      <default>true</default>
+      <summary>Conserver aussi les images copiées</summary>
+    </key>
+
+    <key name="image-cache-size" type="i">
+      <default>0</default>
+      <range min="0" max="10000"/>
+      <summary>Nombre d'images conservées (0 = illimité)</summary>
+    </key>
+
+    <key name="paste-on-select" type="b">
+      <default>true</default>
+      <summary>Coller directement dans la fenêtre active</summary>
+    </key>
+
+    <key name="excluded-apps" type="as">
+      <default>[]</default>
+      <summary>Classes de fenêtres dont les copies sont ignorées</summary>
+    </key>
+
+    <key name="show-indicator" type="b">
+      <default>true</default>
+      <summary>Afficher la dernière copie dans la barre supérieure</summary>
+    </key>
+
+    <key name="indicator-max-chars" type="i">
+      <default>50</default>
+      <range min="10" max="120"/>
+      <summary>Longueur maximale de l'aperçu dans la barre</summary>
+    </key>
+
+    <key name="pending-import" type="s">
+      <default>''</default>
+      <summary>Chemin d'un registry.txt de Clipboard Indicator à importer</summary>
+      <description>Posée par les préférences, consommée puis vidée par l'extension.</description>
+    </key>
+
+  </schema>
+</schemalist>

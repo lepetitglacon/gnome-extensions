@@ -1,0 +1,4 @@
+node_modules/
+*.onnx
+schemas/gschemas.compiled
+*.shell-extension.zip

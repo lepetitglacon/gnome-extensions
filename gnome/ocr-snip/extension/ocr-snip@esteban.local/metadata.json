@@ -1,0 +1,9 @@
+{
+  "uuid": "ocr-snip@esteban.local",
+  "name": "OCR Snip",
+  "description": "Trace une zone à l'écran et copie le texte reconnu (PaddleOCR local).",
+  "shell-version": ["45", "46", "47", "48"],
+  "version": 1,
+  "settings-schema": "org.gnome.shell.extensions.ocr-snip",
+  "url": ""
+}

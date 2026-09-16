@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.focus-new-window"
+          path="/org/gnome/shell/extensions/focus-new-window/">
+    <key name="blacklist" type="as">
+      <default>[]</default>
+      <summary>Applications exclues</summary>
+      <description>
+        Motifs (insensibles a la casse) compares a l'identifiant d'application,
+        a la classe WM et au titre de la fenetre. Une fenetre qui correspond
+        ne recoit pas le focus automatiquement.
+      </description>
+    </key>
+    <key name="skip-notification-windows" type="b">
+      <default>true</default>
+      <summary>Ignorer les fenetres de type notification</summary>
+      <description>
+        Ne jamais donner le focus aux fenetres de type notification, menu,
+        infobulle ou splash screen.
+      </description>
+    </key>
+  </schema>
+</schemalist>

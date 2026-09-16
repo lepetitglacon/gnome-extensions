@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.ocr-snip"
+          path="/org/gnome/shell/extensions/ocr-snip/">
+    <key name="lang" type="s">
+      <default>'fr'</default>
+      <summary>Jeu de modèles OCR</summary>
+      <description>fr = PP-OCRv5 latin (français/anglais), latin = PP-OCRv3, ch = chinois + anglais.</description>
+    </key>
+    <key name="port" type="i">
+      <range min="1024" max="65535"/>
+      <default>8791</default>
+      <summary>Port du démon OCR local</summary>
+    </key>
+    <key name="copy-to-clipboard" type="b">
+      <default>true</default>
+      <summary>Copier le texte reconnu dans le presse-papier</summary>
+    </key>
+    <key name="show-notification" type="b">
+      <default>true</default>
+      <summary>Afficher une notification avec le résultat</summary>
+    </key>
+    <key name="capture-dir" type="s">
+      <default>''</default>
+      <summary>Dossier où écrire les captures</summary>
+      <description>Vide = dossier temporaire du système. « ~ » est développé. Le dossier est créé au besoin ; en cas d'échec on retombe sur /tmp.</description>
+    </key>
+    <key name="keep-captures" type="b">
+      <default>false</default>
+      <summary>Conserver les PNG capturés dans /tmp</summary>
+    </key>
+    <key name="history-size" type="i">
+      <range min="0" max="20"/>
+      <default>5</default>
+      <summary>Nombre de résultats gardés dans le menu</summary>
+    </key>
+  </schema>
+</schemalist>

@@ -1,0 +1,127 @@
+/*
+ * Le panneau porte aussi la classe `popup-menu-content` du thème du shell :
+ * fond, bordure et coins suivent donc automatiquement le thème clair ou
+ * sombre, sans couleur codée en dur ici. Les seules couleurs écrites le sont
+ * en gris translucide, lisible sur les deux thèmes.
+ */
+.clip-flow-panel {
+    padding: 8px;
+    spacing: 4px;
+    border-radius: 12px;
+}
+
+.clip-flow-header {
+    padding: 2px 4px 4px 4px;
+    spacing: 8px;
+}
+
+.clip-flow-title {
+    font-weight: bold;
+    font-size: 1em;
+}
+
+.clip-flow-clear {
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 0.85em;
+    opacity: 0.75;
+}
+
+.clip-flow-clear:hover {
+    opacity: 1;
+    background-color: rgba(127, 127, 127, 0.22);
+}
+
+.clip-flow-search {
+    margin: 0 2px 4px 2px;
+}
+
+.clip-flow-scroll {
+    max-height: 430px;
+}
+
+.clip-flow-list {
+    spacing: 2px;
+}
+
+.clip-flow-row {
+    padding: 8px;
+    border-radius: 8px;
+    transition-duration: 80ms;
+}
+
+.clip-flow-row:hover,
+.clip-flow-row-selected {
+    background-color: rgba(127, 127, 127, 0.22);
+}
+
+.clip-flow-row-box {
+    spacing: 10px;
+}
+
+/* Trois lignes d'aperçu au maximum, une étiquette par ligne. */
+.clip-flow-row-label {
+    font-size: 0.95em;
+}
+
+.clip-flow-row-meta {
+    font-size: 0.75em;
+    opacity: 0.55;
+    padding-top: 3px;
+}
+
+.clip-flow-actions {
+    spacing: 2px;
+}
+
+.clip-flow-action {
+    padding: 4px;
+    border-radius: 6px;
+}
+
+.clip-flow-action:hover {
+    background-color: rgba(127, 127, 127, 0.3);
+}
+
+/* Entrée épinglée : l'icône reste allumée hors survol. */
+.clip-flow-action-on {
+    background-color: rgba(127, 127, 127, 0.22);
+}
+
+.clip-flow-thumb {
+    border-radius: 4px;
+}
+
+.clip-flow-thumb-icon {
+    opacity: 0.5;
+    width: 48px;
+}
+
+.clip-flow-swatch {
+    width: 32px;
+    height: 32px;
+    margin: 0 8px;
+    border-radius: 4px;
+    border: 1px solid rgba(127, 127, 127, 0.45);
+}
+
+.clip-flow-empty,
+.clip-flow-more {
+    padding: 20px 8px;
+    opacity: 0.5;
+    font-size: 0.85em;
+    text-align: center;
+}
+
+.clip-flow-indicator {
+    spacing: 6px;
+}
+
+/*
+ * `max-width` borne l'aperçu même si la limite en caractères est élevée : la
+ * barre supérieure ne doit jamais être poussée par un presse-papier bavard.
+ */
+.clip-flow-indicator-label {
+    font-size: 0.9em;
+    max-width: 320px;
+}

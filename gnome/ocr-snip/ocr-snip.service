@@ -1,0 +1,15 @@
+[Unit]
+Description=ocr-snip — démon OCR local (PaddleOCR ONNX) pour l'extension GNOME
+
+[Service]
+Type=simple
+ExecStart=__NODE__ __SERVER__
+Environment=OCR_SNIP_PORT=8791
+Environment=OCR_SNIP_LANG=fr
+# 0 pour garder le démon résident en permanence.
+Environment=OCR_SNIP_IDLE_TIMEOUT=900
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

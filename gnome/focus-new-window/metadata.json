@@ -1,0 +1,13 @@
+{
+  "uuid": "focus-new-window@esteban.local",
+  "name": "Focus New Window",
+  "description": "Donne le focus aux fenetres qui demandent l'attention, au lieu d'afficher la notification « la fenetre est prete ».",
+  "shell-version": [
+    "45",
+    "46",
+    "47",
+    "48"
+  ],
+  "version": 1,
+  "settings-schema": "org.gnome.shell.extensions.focus-new-window"
+}

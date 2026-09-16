@@ -1,0 +1,6 @@
+/* Utilisé uniquement par le sélecteur de repli : le sélecteur natif du shell
+   apporte déjà son propre style (.select-area-rubberband). */
+.ocr-snip-rubberband {
+    background-color: rgba(53, 132, 228, 0.25);
+    border: 1px solid #3584e4;
+}

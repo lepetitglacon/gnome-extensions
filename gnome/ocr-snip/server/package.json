@@ -1,0 +1,14 @@
+{
+  "name": "ocr-snip-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Démon OCR local (PaddleOCR ONNX) pour l'extension GNOME ocr-snip.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@gutenye/ocr-node": "^1.4.8"
+  }
+}

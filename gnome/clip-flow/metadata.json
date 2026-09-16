@@ -1,0 +1,9 @@
+{
+  "uuid": "clip-flow@esteban.local",
+  "name": "Clip Flow",
+  "description": "Historique de presse-papier façon Win+V : Super+V ouvre un panneau au curseur, on filtre, on colle.",
+  "shell-version": ["45", "46", "47", "48"],
+  "version": 1,
+  "settings-schema": "org.gnome.shell.extensions.clip-flow",
+  "url": ""
+}

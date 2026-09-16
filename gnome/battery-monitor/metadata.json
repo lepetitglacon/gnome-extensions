@@ -1,0 +1,9 @@
+{
+  "uuid": "battery-monitor@esteban.local",
+  "name": "Battery Monitor (périphériques)",
+  "description": "Affiche le niveau de batterie des périphériques Bluetooth et sans fil (casque, clavier, souris) dans la barre Zorin.",
+  "shell-version": ["45", "46", "47", "48"],
+  "version": 1,
+  "settings-schema": "",
+  "url": ""
+}

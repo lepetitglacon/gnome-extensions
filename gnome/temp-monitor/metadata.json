@@ -1,0 +1,9 @@
+{
+  "uuid": "temp-monitor@esteban.local",
+  "name": "Temp Monitor (CPU/GPU)",
+  "description": "Affiche la température du CPU et du GPU NVIDIA dans la barre Zorin.",
+  "shell-version": ["45", "46", "47", "48"],
+  "version": 1,
+  "settings-schema": "",
+  "url": ""
+}
