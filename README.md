@@ -14,7 +14,7 @@ GNOME 45 à 48.
 | [`gnome/clip-flow`](gnome/clip-flow) | Historique de presse-papier façon <kbd>Win</kbd>+<kbd>V</kbd> : <kbd>Super</kbd>+<kbd>V</kbd> ouvre un panneau au curseur, on filtre, on colle. |
 | [`gnome/focus-new-window`](gnome/focus-new-window) | Donne le focus aux fenêtres qui demandent l'attention, au lieu de la notification « la fenêtre est prête ». |
 | [`gnome/temp-monitor`](gnome/temp-monitor) | Température du CPU et du GPU NVIDIA dans la barre. |
-| [`gnome/ocr-snip`](gnome/ocr-snip) | Trace une zone à l'écran et copie le texte reconnu (PaddleOCR en local). Projet à part : extension + serveur Node, voir son propre README. |
+| [`gnome/ocr-snip`](gnome/ocr-snip) | Trace une zone à l'écran et copie le texte reconnu (PaddleOCR en local). Embarque aussi son serveur Node, voir son propre README. |
 
 ## Installation
 
@@ -24,9 +24,14 @@ cd gnome-extensions
 ./install.sh
 ```
 
-Le script copie chaque extension sous son UUID dans
-`~/.local/share/gnome-shell/extensions/`, compile ses schémas GSettings, et
-affiche la commande d'activation. Pour n'en installer qu'une :
+Le script **lie** chaque extension depuis ce dépôt vers
+`~/.local/share/gnome-shell/extensions/<uuid>`, et compile ses schémas
+GSettings. Il n'y a jamais de copie : ce qui est dans le dépôt est ce qui
+tourne. Modifier le dépôt modifie l'extension en place, et un `git pull` suffit
+à tout mettre à jour.
+
+En contrepartie, **le dépôt doit rester où il est** : le déplacer ou le
+supprimer casse les liens. Pour n'installer qu'une extension :
 
 ```bash
 ./install.sh clip-flow
@@ -43,13 +48,19 @@ Puis :
 gnome-extensions enable battery-monitor@esteban.local
 ```
 
-`ocr-snip` a besoin de son serveur OCR : il n'est pas géré par `install.sh`,
-suivre [`gnome/ocr-snip/README.md`](gnome/ocr-snip/README.md).
+`ocr-snip` a en plus un démon OCR local (serveur Node + modèles PaddleOCR), que
+`install.sh` ne gère pas :
+
+```bash
+gnome/ocr-snip/setup-server.sh
+```
 
 ## Développement
 
-Le code modifié n'est pris en compte qu'après un redémarrage du shell : les
-modules ES sont mis en cache, un `disable` puis `enable` ne suffit pas.
+Les extensions installées étant des liens vers ce dépôt, il n'y a rien à
+recopier après une modification. En revanche le code modifié n'est pris en
+compte qu'après un redémarrage du shell : les modules ES sont mis en cache, un
+`disable` puis `enable` ne suffit pas.
 
 Pour voir les erreurs d'une extension :
 
