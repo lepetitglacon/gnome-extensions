@@ -1,17 +1,20 @@
 #!/usr/bin/env bash
-# Installe les extensions GNOME de ce depot dans la session courante.
+# Installe les extensions GNOME et les outils de ce depot dans la session courante.
 #
 #   ./install.sh            installe tout
-#   ./install.sh clip-flow  installe une extension precise
+#   ./install.sh clip-flow  installe une extension (gnome/) ou un outil (outils/) precis
 #
 # Chaque extension est LIEE (lien symbolique) depuis ce depot vers
-# ~/.local/share/gnome-shell/extensions/<uuid>. Il n'y a donc jamais de copie :
+# ~/.local/share/gnome-shell/extensions/<uuid>, chaque outil vers ~/.local/bin
+# (et son unite systemd --user s'il en a une). Il n'y a donc jamais de copie :
 # ce qui est dans le depot est ce qui tourne, et un « git pull » suffit a
 # mettre a jour. Le depot doit rester en place.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEST="$HOME/.local/share/gnome-shell/extensions"
+BIN="$HOME/.local/bin"
+UNITS="$HOME/.config/systemd/user"
 mkdir -p "$DEST"
 
 # Ou est le dossier d'extension : a la racine du module, ou sous extension/<uuid>
@@ -46,17 +49,43 @@ install_one() {
     echo "→ $name  ->  $uuid"
 }
 
+# Un outil outils/<nom> : l'executable <nom> va dans ~/.local/bin, et son
+# unite <nom>.service eventuelle est activee (puis relancee, pour prendre le code a jour).
+install_tool() {
+    local dir="$1" name
+    name="$(basename "$dir")"
+    mkdir -p "$BIN"
+    ln -sfn "$dir/$name" "$BIN/$name"
+
+    if [ -f "$dir/$name.service" ]; then
+        mkdir -p "$UNITS"
+        ln -sfn "$dir/$name.service" "$UNITS/$name.service"
+        systemctl --user daemon-reload
+        systemctl --user enable "$name.service" >/dev/null 2>&1
+        systemctl --user restart "$name.service"
+    fi
+
+    echo "→ $name  ->  $BIN/$name"
+}
+
 modules=()
+tools=()
 if [ $# -gt 0 ]; then
-    for a in "$@"; do modules+=("$ROOT/gnome/$a"); done
+    for a in "$@"; do
+        if   [ -d "$ROOT/gnome/$a" ];  then modules+=("$ROOT/gnome/$a")
+        elif [ -d "$ROOT/outils/$a" ]; then tools+=("$ROOT/outils/$a")
+        else echo "!! introuvable : $a" >&2; exit 1
+        fi
+    done
 else
-    for d in "$ROOT"/gnome/*/; do modules+=("${d%/}"); done
+    for d in "$ROOT"/gnome/*/;  do modules+=("${d%/}"); done
+    for d in "$ROOT"/outils/*/; do [ -d "$d" ] && tools+=("${d%/}"); done
 fi
 
-for m in "${modules[@]}"; do
-    [ -d "$m" ] || { echo "!! introuvable : $(basename "$m")" >&2; exit 1; }
-    install_one "$m"
-done
+for m in "${modules[@]}"; do install_one "$m"; done
+for t in "${tools[@]}";   do install_tool "$t"; done
+
+[ ${#modules[@]} -eq 0 ] && exit 0
 
 echo
 echo "Redemarre GNOME Shell pour qu'il decouvre les nouvelles extensions :"

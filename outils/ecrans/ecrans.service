@@ -1,0 +1,12 @@
+[Unit]
+Description=Réapplique la disposition des écrans à chaque (dé)branchement
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+ExecStart=%h/.local/bin/ecrans watch
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=graphical-session.target

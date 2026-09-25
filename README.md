@@ -1,7 +1,7 @@
 # gnome-extensions
 
-Mes extensions GNOME Shell, faites maison, pour retrouver le même bureau sur
-tous mes PC Zorin.
+Mes extensions GNOME Shell et petits outils, faits maison, pour retrouver le
+même bureau sur tous mes PC Zorin.
 
 Testées sur **Zorin OS 18 / GNOME Shell 46**, en X11. Les métadonnées déclarent
 GNOME 45 à 48.
@@ -16,6 +16,12 @@ GNOME 45 à 48.
 | [`gnome/temp-monitor`](gnome/temp-monitor) | Température du CPU et du GPU NVIDIA dans la barre. |
 | [`gnome/ocr-snip`](gnome/ocr-snip) | Trace une zone à l'écran et copie le texte reconnu (PaddleOCR en local). Embarque aussi son serveur Node, voir son propre README. |
 
+## Les outils
+
+| Dossier | Ce qu'il fait |
+|---|---|
+| [`outils/ecrans`](outils/ecrans) | Retient la disposition des écrans par jeu d'écrans branchés et la réapplique quand GNOME l'oublie (dock DisplayLink/MST). Service `systemd --user`. |
+
 ## Installation
 
 ```bash
@@ -26,15 +32,18 @@ cd gnome-extensions
 
 Le script **lie** chaque extension depuis ce dépôt vers
 `~/.local/share/gnome-shell/extensions/<uuid>`, et compile ses schémas
-GSettings. Il n'y a jamais de copie : ce qui est dans le dépôt est ce qui
+GSettings. Chaque outil est lié dans `~/.local/bin`, et son unité
+`systemd --user` éventuelle est liée, activée et relancée. Il n'y a jamais de
+copie : ce qui est dans le dépôt est ce qui
 tourne. Modifier le dépôt modifie l'extension en place, et un `git pull` suffit
 à tout mettre à jour.
 
 En contrepartie, **le dépôt doit rester où il est** : le déplacer ou le
-supprimer casse les liens. Pour n'installer qu'une extension :
+supprimer casse les liens. Pour n'installer qu'une extension ou qu'un outil :
 
 ```bash
 ./install.sh clip-flow
+./install.sh ecrans
 ```
 
 GNOME ne découvre une extension neuve qu'après un redémarrage du shell :
@@ -61,6 +70,12 @@ Les extensions installées étant des liens vers ce dépôt, il n'y a rien à
 recopier après une modification. En revanche le code modifié n'est pris en
 compte qu'après un redémarrage du shell : les modules ES sont mis en cache, un
 `disable` puis `enable` ne suffit pas.
+
+Pour un outil avec service, relancer le service (ou repasser `./install.sh <outil>`) :
+
+```bash
+systemctl --user restart ecrans
+```
 
 Pour voir les erreurs d'une extension :
 

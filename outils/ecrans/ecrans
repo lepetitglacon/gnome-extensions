@@ -1,0 +1,356 @@
+#!/usr/bin/env python3
+"""ecrans — retient la disposition des écrans par jeu d'écrans branchés, et la réapplique.
+
+GNOME (Mutter) range ses dispositions par nom de connecteur. Derrière un dock
+DisplayLink ou MST ce nom change d'un branchement à l'autre (DVI-I-1, DVI-I-2-1…) :
+GNOME croit voir un nouveau montage et repart sur sa disposition par défaut.
+Ici un écran est identifié par son EDID (fabricant, modèle, n° de série).
+"""
+
+import argparse
+import json
+import os
+import subprocess
+import sys
+import time
+from datetime import datetime
+from pathlib import Path
+
+from gi.repository import Gio, GLib
+
+DISPLAY_CONFIG = "org.gnome.Mutter.DisplayConfig"
+DISPLAY_CONFIG_PATH = "/org/gnome/Mutter/DisplayConfig"
+CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "ecrans"
+PROFILES_FILE = CONFIG_DIR / "profiles.json"
+
+# Méthodes de ApplyMonitorsConfig.
+VERIFY, PERSISTENT = 0, 2
+
+# Un dock fait apparaître ses écrans un par un : on attend que ça se calme.
+SETTLE_MS = 2000
+# Après un branchement GNOME peut réécraser la disposition une 2e fois :
+# on la défend pendant ce délai, ensuite les changements manuels sont respectés.
+ENFORCE_S = 15
+MAX_ATTEMPTS = 3
+
+
+def log(msg):
+    print(f"[{datetime.now():%H:%M:%S}] {msg}", flush=True)
+
+
+def lid_is_closed():
+    try:
+        bus = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
+        res = bus.call_sync(
+            "org.freedesktop.UPower", "/org/freedesktop/UPower",
+            "org.freedesktop.DBus.Properties", "Get",
+            GLib.Variant("(ss)", ("org.freedesktop.UPower", "LidIsClosed")),
+            GLib.VariantType("(v)"), Gio.DBusCallFlags.NONE, 2000, None)
+        return bool(res.unpack()[0])
+    except GLib.Error:
+        return False
+
+
+def display_config():
+    return Gio.DBusProxy.new_for_bus_sync(
+        Gio.BusType.SESSION, Gio.DBusProxyFlags.DO_NOT_LOAD_PROPERTIES, None,
+        DISPLAY_CONFIG, DISPLAY_CONFIG_PATH, DISPLAY_CONFIG, None)
+
+
+class Mode:
+    def __init__(self, raw):
+        self.id, self.width, self.height, self.refresh, _, self.scales, props = raw
+        self.current = bool(props.get("is-current"))
+        self.preferred = bool(props.get("is-preferred"))
+
+    def __str__(self):
+        return f"{self.width}x{self.height}@{self.refresh:.2f}"
+
+
+class Monitor:
+    def __init__(self, raw):
+        (self.connector, vendor, product, serial), modes, props = raw
+        self.base_id = f"{vendor}|{product}|{serial}"
+        self.id = self.base_id
+        self.name = props.get("display-name") or self.base_id
+        self.builtin = bool(props.get("is-builtin"))
+        self.modes = [Mode(m) for m in modes]
+        self.current = next((m for m in self.modes if m.current), None)
+        self.preferred = next((m for m in self.modes if m.preferred), None)
+
+
+class State:
+    def __init__(self, proxy):
+        serial, monitors, logical, props = proxy.call_sync(
+            "GetCurrentState", None, Gio.DBusCallFlags.NONE, -1, None).unpack()
+        self.serial = serial
+        self.layout_mode = props.get("layout-mode", 1)
+        self.can_change_layout_mode = bool(props.get("supports-changing-layout-mode"))
+        self.monitors = [Monitor(m) for m in monitors]
+
+        # Deux écrans identiques sans n° de série : départagés par l'ordre des connecteurs.
+        seen = {}
+        for m in sorted(self.monitors, key=lambda m: m.connector):
+            seen[m.base_id] = seen.get(m.base_id, 0) + 1
+            if seen[m.base_id] > 1:
+                m.id = f"{m.base_id}#{seen[m.base_id]}"
+        self.by_id = {m.id: m for m in self.monitors}
+        by_connector = {m.connector: m for m in self.monitors}
+
+        # Couvercle fermé : l'écran interne ne fait pas partie du montage (comme chez Mutter).
+        lid_closed = lid_is_closed()
+        self.usable = [m for m in self.monitors if not (m.builtin and lid_closed)]
+        self.key = sorted(m.id for m in self.usable)
+
+        self.logical = []
+        for x, y, scale, transform, primary, specs, _ in logical:
+            mons = [by_connector[s[0]] for s in specs if s[0] in by_connector]
+            self.logical.append({
+                "x": x, "y": y, "scale": scale, "transform": transform, "primary": bool(primary),
+                "monitors": [{
+                    "id": m.id, "name": m.name,
+                    "width": m.current.width, "height": m.current.height,
+                    "refresh": m.current.refresh,
+                } for m in mons if m.current],
+            })
+
+
+def signature(logical):
+    return {
+        (m["id"], lm["x"], lm["y"], round(lm["scale"], 2), lm["transform"], lm["primary"],
+         m["width"], m["height"], round(m["refresh"], 1))
+        for lm in logical for m in lm["monitors"]
+    }
+
+
+def load_profiles():
+    try:
+        return json.loads(PROFILES_FILE.read_text())
+    except FileNotFoundError:
+        return {}
+
+
+def write_profiles(profiles):
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    tmp = PROFILES_FILE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(profiles, indent=2, ensure_ascii=False) + "\n")
+    tmp.replace(PROFILES_FILE)
+
+
+def profile_for(profiles, key):
+    return next(((n, p) for n, p in profiles.items() if p["key"] == key), (None, None))
+
+
+def pick_mode(monitor, saved):
+    same_size = [md for md in monitor.modes
+                 if md.width == saved["width"] and md.height == saved["height"]]
+    if same_size:
+        return min(same_size, key=lambda md: abs(md.refresh - saved["refresh"]))
+    log(f"  {monitor.name} : {saved['width']}x{saved['height']} indisponible, mode préféré utilisé")
+    return monitor.preferred or monitor.modes[0]
+
+
+def apply_profile(proxy, state, profile, verify=False):
+    logical = []
+    for lm in profile["logical"]:
+        specs, scales = [], None
+        for saved in lm["monitors"]:
+            monitor = state.by_id.get(saved["id"])
+            if monitor is None:
+                raise RuntimeError(f"écran absent : {saved['name']}")
+            mode = pick_mode(monitor, saved)
+            specs.append((monitor.connector, mode.id, {}))
+            scales = scales or mode.scales
+        # Mutter refuse une échelle que le mode ne propose pas.
+        scale = min(scales, key=lambda s: abs(s - lm["scale"])) if scales else lm["scale"]
+        logical.append((lm["x"], lm["y"], scale, lm["transform"], lm["primary"], specs))
+    if logical and not any(lm[4] for lm in logical):
+        logical[0] = logical[0][:4] + (True,) + logical[0][5:]
+
+    props = {}
+    if state.can_change_layout_mode:
+        props["layout-mode"] = GLib.Variant("u", profile.get("layout_mode", state.layout_mode))
+    proxy.call_sync(
+        "ApplyMonitorsConfig",
+        GLib.Variant("(uua(iiduba(ssa{sv}))a{sv})",
+                     (state.serial, VERIFY if verify else PERSISTENT, logical, props)),
+        Gio.DBusCallFlags.NONE, -1, None)
+
+
+def notify(body):
+    try:
+        subprocess.run(["notify-send", "-a", "Écrans", "-i", "video-display", "Écrans", body],
+                       timeout=5, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+
+
+# ---------- commandes ----------
+
+def cmd_status(args):
+    state = State(display_config())
+    placed = {m["id"]: lm for lm in state.logical for m in lm["monitors"]}
+    print("Écrans branchés :")
+    for m in sorted(state.monitors, key=lambda m: m.connector):
+        lm = placed.get(m.id)
+        where = (f"({lm['x']},{lm['y']}) ×{lm['scale']:g}{'  principal' if lm['primary'] else ''}"
+                 if lm else "éteint")
+        print(f"  {m.connector:<12} {m.name:<28} {m.id:<40} {str(m.current or '-'):<20} {where}")
+    name, profile = profile_for(load_profiles(), state.key)
+    if not profile:
+        print("\nProfil : aucun pour ce jeu d'écrans → arrange-les puis `ecrans save <nom>`")
+    elif signature(state.logical) == signature(profile["logical"]):
+        print(f"\nProfil : {name} — disposition en place")
+    else:
+        print(f"\nProfil : {name} — disposition DIFFÉRENTE → `ecrans apply`")
+
+
+def cmd_save(args):
+    state = State(display_config())
+    if not state.logical:
+        sys.exit("Aucun écran actif, rien à enregistrer.")
+    profiles = load_profiles()
+    name = args.name or " + ".join(m.name for m in state.usable if not m.builtin) or "Écran interne"
+    for old in [n for n, p in profiles.items() if p["key"] == state.key and n != name]:
+        print(f"Remplace le profil « {old} » (même jeu d'écrans).")
+        del profiles[old]
+    profiles[name] = {
+        "key": state.key,
+        "layout_mode": state.layout_mode,
+        "saved_at": datetime.now().isoformat(timespec="seconds"),
+        "logical": state.logical,
+    }
+    write_profiles(profiles)
+    print(f"Profil « {name} » enregistré ({len(state.key)} écrans).")
+
+
+def cmd_apply(args):
+    proxy = display_config()
+    state = State(proxy)
+    profiles = load_profiles()
+    if args.name:
+        name, profile = args.name, profiles.get(args.name)
+        if profile is None:
+            sys.exit(f"Pas de profil « {args.name} ». Voir `ecrans list`.")
+        if profile["key"] != state.key:
+            sys.exit(f"« {name} » ne correspond pas aux écrans branchés.")
+    else:
+        name, profile = profile_for(profiles, state.key)
+        if profile is None:
+            sys.exit("Aucun profil pour ce jeu d'écrans → arrange-les puis `ecrans save <nom>`.")
+    if not args.dry_run and signature(state.logical) == signature(profile["logical"]):
+        print(f"« {name} » est déjà en place.")
+        return
+    try:
+        apply_profile(proxy, state, profile, verify=args.dry_run)
+    except (GLib.Error, RuntimeError) as e:
+        sys.exit(f"Refusé : {getattr(e, 'message', e)}")
+    print(f"« {name} » {'valide (rien appliqué)' if args.dry_run else 'appliqué'}.")
+
+
+def cmd_list(args):
+    profiles = load_profiles()
+    if not profiles:
+        print("Aucun profil. Arrange tes écrans puis `ecrans save <nom>`.")
+    for name, p in profiles.items():
+        print(f"{name}  (enregistré le {p['saved_at']})")
+        for lm in p["logical"]:
+            for m in lm["monitors"]:
+                print(f"    {m['name']:<28} {m['width']}x{m['height']}@{m['refresh']:.2f}"
+                      f"  ({lm['x']},{lm['y']}) ×{lm['scale']:g}{'  principal' if lm['primary'] else ''}")
+
+
+def cmd_forget(args):
+    profiles = load_profiles()
+    if profiles.pop(args.name, None) is None:
+        sys.exit(f"Pas de profil « {args.name} ».")
+    write_profiles(profiles)
+    print(f"Profil « {args.name} » supprimé.")
+
+
+class Watcher:
+    def __init__(self):
+        self.proxy = display_config()
+        self.last_key = None
+        self.enforce_until = 0
+        self.attempts = 0
+        self.warned_key = None
+        self.timer = None
+        self.proxy.connect("g-signal", self.on_signal)
+        # gnome-shell qui (re)démarre après nous.
+        self.proxy.connect("notify::g-name-owner", lambda *_: self.schedule())
+        self.schedule()
+
+    def on_signal(self, _proxy, _sender, signal, _params):
+        if signal == "MonitorsChanged":
+            self.schedule()
+
+    def schedule(self):
+        if self.timer:
+            GLib.source_remove(self.timer)
+        self.timer = GLib.timeout_add(SETTLE_MS, self.settle)
+
+    def settle(self):
+        self.timer = None
+        try:
+            self.check()
+        except (GLib.Error, RuntimeError, KeyError) as e:
+            log(f"erreur : {getattr(e, 'message', e)}")
+        return False
+
+    def check(self):
+        state = State(self.proxy)
+        now = time.monotonic()
+        if state.key != self.last_key:
+            self.last_key = state.key
+            self.enforce_until = now + ENFORCE_S
+            self.attempts = 0
+            log(f"écrans : {', '.join(m.name for m in state.usable) or 'aucun'}")
+        elif now > self.enforce_until:
+            return
+
+        name, profile = profile_for(load_profiles(), state.key)
+        if profile is None:
+            if self.warned_key != state.key:
+                self.warned_key = state.key
+                log("  pas de profil pour ce jeu d'écrans")
+            return
+        if signature(state.logical) == signature(profile["logical"]):
+            return
+        if self.attempts >= MAX_ATTEMPTS:
+            log(f"  « {name} » : abandon après {MAX_ATTEMPTS} essais")
+            return
+        self.attempts += 1
+        apply_profile(self.proxy, state, profile)
+        log(f"  « {name} » réappliqué")
+        notify(f"Disposition « {name} » réappliquée")
+
+
+def cmd_watch(args):
+    Watcher()
+    log("surveillance des écrans démarrée")
+    GLib.MainLoop().run()
+
+
+def main():
+    parser = argparse.ArgumentParser(prog="ecrans", description=__doc__.splitlines()[0])
+    sub = parser.add_subparsers(dest="cmd")
+    sub.add_parser("status", help="écrans branchés et profil correspondant").set_defaults(func=cmd_status)
+    p = sub.add_parser("save", help="enregistre la disposition actuelle")
+    p.add_argument("name", nargs="?", help="nom du profil (défaut : noms des écrans)")
+    p.set_defaults(func=cmd_save)
+    p = sub.add_parser("apply", help="réapplique le profil des écrans branchés")
+    p.add_argument("name", nargs="?")
+    p.add_argument("--dry-run", action="store_true", help="fait valider par GNOME sans appliquer")
+    p.set_defaults(func=cmd_apply)
+    sub.add_parser("list", help="liste les profils").set_defaults(func=cmd_list)
+    p = sub.add_parser("forget", help="supprime un profil")
+    p.add_argument("name")
+    p.set_defaults(func=cmd_forget)
+    sub.add_parser("watch", help="réapplique tout seul à chaque (dé)branchement").set_defaults(func=cmd_watch)
+    args = parser.parse_args()
+    (args.func if args.cmd else cmd_status)(args)
+
+
+if __name__ == "__main__":
+    main()
